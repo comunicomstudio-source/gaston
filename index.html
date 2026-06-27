@@ -608,6 +608,7 @@
       const gasto = {
         moneda: datosTicket.moneda || "EUR",
         multitipo_iva: !!datosTicket.multitipo_iva,
+        confianza: datosTicket.confianza || "",
       };
       document.querySelectorAll("#datos-ticket [data-clave]").forEach(function (control) {
         gasto[control.dataset.clave] = control.value.trim();
