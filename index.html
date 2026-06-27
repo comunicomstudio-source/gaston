@@ -216,6 +216,42 @@
     @media (prefers-color-scheme: dark) {
       .aviso { background: #3a2f00; color: #ffd86b; }
     }
+    .aviso-error { background: #ffe0e0; color: #9b1c1c; }
+    @media (prefers-color-scheme: dark) {
+      .aviso-error { background: #45161a; color: #ff9aa2; }
+    }
+
+    /* Botón gris (secundario neutro) */
+    .boton-gris {
+      width: 100%; border: none;
+      border-radius: var(--r-boton);
+      background: rgba(120,120,128,0.16);
+      color: var(--texto);
+      font-size: 16px; font-weight: 600;
+      padding: 14px; cursor: pointer; margin-top: 10px;
+    }
+    .boton-gris:active { opacity: 0.8; }
+
+    /* Dashboard */
+    .dash { width: 100%; max-width: 440px; }
+    .dash-cifras { display: flex; gap: 10px; margin-bottom: 18px; }
+    .dash-tarjeta {
+      flex: 1; background: var(--superficie);
+      border-radius: var(--r-tarjeta); padding: 14px;
+      text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .dash-tarjeta .cifra { font-size: 22px; font-weight: 700; }
+    .dash-tarjeta .etq { font-size: 12px; color: var(--texto-2); margin-top: 2px; }
+    .dash h2 {
+      font-size: 13px; color: var(--texto-2); text-transform: uppercase;
+      letter-spacing: 0.4px; margin: 18px 0 8px;
+    }
+    .barra-fila { margin-bottom: 9px; }
+    .barra-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 3px; }
+    .barra-top .imp { font-weight: 600; }
+    .barra { height: 8px; border-radius: 4px; background: rgba(120,120,128,0.16); overflow: hidden; }
+    .barra > span { display: block; height: 100%; background: var(--acento); border-radius: 4px; }
+    .dash-vacio { color: var(--texto-2); text-align: center; padding: 24px 0; }
 
     /* Pantalla de éxito: botón + enlaces */
     .bloque-exito { width: 100%; max-width: 420px; }
@@ -268,6 +304,7 @@
         <p class="tagline" id="cargando-sub">Gastón está apuntando los datos.</p>
       </div>
     </section>
+    <footer class="creditos">by Oriol Peñalver and Claude</footer>
   </main>
 
   <!-- VISTA 4: revisión de los datos extraídos -->
@@ -279,6 +316,7 @@
 
     <section class="centro" style="flex-direction:column; gap:0;">
       <div class="aviso oculto" id="aviso-confianza"></div>
+      <div class="aviso aviso-error oculto" id="aviso-cuadre"></div>
       <div class="datos" id="datos-ticket"></div>
     </section>
 
@@ -286,6 +324,7 @@
       <button class="boton" id="btn-guardar" type="button">Guardar gasto</button>
       <button class="boton-2" id="btn-otra" type="button">Hacer otra foto</button>
     </div>
+    <footer class="creditos">by Oriol Peñalver and Claude</footer>
   </main>
 
   <!-- VISTA 5: gasto guardado -->
@@ -308,6 +347,28 @@
         </div>
       </div>
     </section>
+
+    <div class="acciones">
+      <button class="boton-gris" id="btn-dashboard" type="button">📊 Ver dashboard</button>
+    </div>
+    <footer class="creditos">by Oriol Peñalver and Claude</footer>
+  </main>
+
+  <!-- VISTA 6: dashboard / resumen de gastos -->
+  <main class="pantalla oculto" id="vista-dashboard">
+    <header class="cabecera">
+      <h1 class="marca">Resumen</h1>
+      <p class="tagline">tus gastos de un vistazo</p>
+    </header>
+
+    <section class="centro" style="flex-direction:column; gap:0; align-items:center;">
+      <div class="dash" id="dashboard-cont"></div>
+    </section>
+
+    <div class="acciones">
+      <button class="boton-gris" id="btn-dash-volver" type="button">Volver</button>
+    </div>
+    <footer class="creditos">by Oriol Peñalver and Claude</footer>
   </main>
 
   <!-- Abre la cámara del móvil (o el selector de archivos en escritorio) -->
@@ -318,6 +379,9 @@
     // URL del backend (Apps Script). Si algún día rehaces el despliegue,
     // cambia SOLO esta línea por la nueva URL que acabe en /exec.
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbx6qG67cRQleQCOg-x7J6EKv-GN2pf-6_R1ItfTf1oIUWXvO9jWW5QEAgTGYlssqEIX5g/exec";
+
+    // Token compartido (debe coincidir con el APP_TOKEN del Apps Script).
+    const APP_TOKEN = "gstn_kP7mZ2aQ9xV4tR8wL3";
 
     // Categorías válidas (deben coincidir con las del backend y la Sheet).
     const CATEGORIAS = [
@@ -345,7 +409,7 @@
 
     // Referencias a los elementos que vamos a manejar.
     const inputFoto = document.getElementById("input-foto");
-    const VISTAS = ["inicio", "cargando", "revision", "exito"];
+    const VISTAS = ["inicio", "cargando", "revision", "exito", "dashboard"];
 
     // El archivo elegido y la foto ya encogida (base64), para reusarla al guardar.
     let archivoActual = null;
@@ -435,7 +499,7 @@
     async function leerTicket(imagenBase64) {
       const res = await fetch(BACKEND_URL, {
         method: "POST",
-        body: JSON.stringify({ imagen: imagenBase64, tipo: "image/jpeg" }),
+        body: JSON.stringify({ token: APP_TOKEN, imagen: imagenBase64, tipo: "image/jpeg" }),
       });
       return res.json();
     }
@@ -448,6 +512,7 @@
       datosTicket = d || {};
       const cont = document.getElementById("datos-ticket");
       cont.innerHTML = "";
+      cont.oninput = validarCuadre;   // re-comprueba las cuentas al editar
 
       CAMPOS.forEach(function (campo) {
         const clave = campo[0], etiqueta = campo[1], tipo = campo[2];
@@ -501,6 +566,41 @@
       } else {
         aviso.classList.add("oculto");
       }
+      validarCuadre();
+    }
+
+    // Lee un importe del formulario como número (o NaN si está vacío).
+    function valorNum(clave) {
+      const el = document.getElementById("f-" + clave);
+      if (!el) return NaN;
+      const v = (el.value || "").toString().replace(",", ".").trim();
+      return v === "" ? NaN : Number(v);
+    }
+
+    // Comprueba que las cuentas cuadren y avisa si no (base+IVA=total, IVA=base×tipo%).
+    function validarCuadre() {
+      const base = valorNum("base"), cuota = valorNum("cuota_iva");
+      const total = valorNum("total"), tipo = valorNum("tipo_iva");
+      const problemas = [];
+      if (!isNaN(base) && !isNaN(cuota) && !isNaN(total) &&
+          Math.abs(base + cuota - total) > 0.02) {
+        problemas.push("base (" + base.toFixed(2) + ") + IVA (" + cuota.toFixed(2) +
+          ") = " + (base + cuota).toFixed(2) + ", pero el total pone " + total.toFixed(2) + ".");
+      }
+      if (!isNaN(base) && !isNaN(tipo) && !isNaN(cuota)) {
+        const esperada = base * tipo / 100;
+        if (Math.abs(esperada - cuota) > 0.02) {
+          problemas.push("con base " + base.toFixed(2) + " y " + tipo + "% el IVA debería ser " +
+            esperada.toFixed(2) + ", no " + cuota.toFixed(2) + ".");
+        }
+      }
+      const aviso = document.getElementById("aviso-cuadre");
+      if (problemas.length) {
+        aviso.textContent = "⚠️ Las cuentas no cuadran: " + problemas.join(" ") + " Revisa los importes.";
+        aviso.classList.remove("oculto");
+      } else {
+        aviso.classList.add("oculto");
+      }
     }
 
     // Lee las casillas (ya editadas por el usuario) y arma el objeto del gasto.
@@ -530,7 +630,7 @@
         const res = await fetch(BACKEND_URL, {
           method: "POST",
           body: JSON.stringify({
-            accion: "guardar", gasto: gasto, imagen: imagenActual,
+            token: APP_TOKEN, accion: "guardar", gasto: gasto, imagen: imagenActual,
             tipo: "image/jpeg", forzar: forzar,
           }),
         });
@@ -558,6 +658,86 @@
         alert("Hubo un problema al guardar:\n" + err);
         mostrar("revision");
       }
+    }
+
+    // ── Dashboard ──────────────────────────────────────────────────
+    document.getElementById("btn-dashboard").addEventListener("click", abrirDashboard);
+    document.getElementById("btn-dash-volver").addEventListener("click", function () {
+      mostrar("exito");
+    });
+
+    async function abrirDashboard() {
+      cargandoTexto("Cargando resumen…", "Sumando tus gastos.");
+      mostrar("cargando");
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: "POST",
+          body: JSON.stringify({ token: APP_TOKEN, accion: "resumen" }),
+        });
+        const r = await res.json();
+        if (r.error) { alert("No se pudo cargar el resumen:\n" + r.error); mostrar("exito"); return; }
+        pintarDashboard(r);
+        mostrar("dashboard");
+      } catch (err) {
+        alert("Hubo un problema:\n" + err);
+        mostrar("exito");
+      }
+    }
+
+    // Formatea un número como importe en euros (1234.5 → "1.234,50 €").
+    function euros(n) {
+      return (Number(n) || 0).toLocaleString("es-ES", {
+        minimumFractionDigits: 2, maximumFractionDigits: 2,
+      }) + " €";
+    }
+
+    // Nombre del mes "yyyy-MM" → "sept. 2025".
+    function nombreMes(clave) {
+      const partes = clave.split("-");
+      const d = new Date(Number(partes[0]), Number(partes[1]) - 1, 1);
+      return d.toLocaleDateString("es-ES", { month: "short", year: "numeric" });
+    }
+
+    function pintarDashboard(r) {
+      const cont = document.getElementById("dashboard-cont");
+      if (!r.num_tickets) {
+        cont.innerHTML = '<p class="dash-vacio">Aún no hay gastos guardados.<br>Apunta tu primer ticket y vuelve aquí.</p>';
+        return;
+      }
+
+      let html = '<div class="dash-cifras">' +
+        '<div class="dash-tarjeta"><div class="cifra">' + euros(r.total) + '</div><div class="etq">Total</div></div>' +
+        '<div class="dash-tarjeta"><div class="cifra">' + euros(r.mes_actual) + '</div><div class="etq">Este mes</div></div>' +
+        '<div class="dash-tarjeta"><div class="cifra">' + r.num_tickets + '</div><div class="etq">Tickets</div></div>' +
+        '</div>';
+
+      html += seccionBarras("Por categoría", r.por_categoria, function (x) { return x.categoria; });
+      html += seccionBarras("Últimos meses", r.por_mes, function (x) { return nombreMes(x.mes); });
+
+      cont.innerHTML = html;
+    }
+
+    // Construye una sección de barras (categorías o meses) escaladas al máximo.
+    function seccionBarras(titulo, lista, etiqueta) {
+      if (!lista || !lista.length) return "";
+      const maximo = Math.max.apply(null, lista.map(function (x) { return x.total; })) || 1;
+      let h = "<h2>" + titulo + "</h2>";
+      lista.forEach(function (x) {
+        const pct = Math.round((x.total / maximo) * 100);
+        h += '<div class="barra-fila">' +
+               '<div class="barra-top"><span></span><span class="imp"></span></div>' +
+               '<div class="barra"><span style="width:' + pct + '%"></span></div>' +
+             '</div>';
+      });
+      // Rellenamos textos sin innerHTML para evitar problemas con caracteres raros.
+      const cont = document.createElement("div");
+      cont.innerHTML = h;
+      const filas = cont.querySelectorAll(".barra-fila");
+      lista.forEach(function (x, i) {
+        filas[i].querySelector(".barra-top span:first-child").textContent = etiqueta(x);
+        filas[i].querySelector(".imp").textContent = euros(x.total);
+      });
+      return cont.innerHTML;
     }
 
     // Registramos el service worker: hace que la app cargue offline y sea instalable.
