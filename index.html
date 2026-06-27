@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover: necesario para usar las safe areas del iPhone -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+
+  <!-- Que la trate como app a pantalla completa cuando se instala -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Gastón">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Gastón — tu asistente de tickets</title>
+
+  <style>
+    /* ===== Tokens de diseño (del CLAUDE.md) ===== */
+    :root {
+      --acento: #0A84FF;
+      --fondo: #F2F2F7;
+      --superficie: #FFFFFF;
+      --texto: #1C1C1E;
+      --texto-2: #8E8E93;
+
+      --r-tarjeta: 16px;
+      --r-boton: 12px;
+
+      --curva-ios: cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fondo: #000000;
+        --superficie: #1C1C1E;
+        --texto: #FFFFFF;
+        --texto-2: #8E8E93;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+      background: var(--fondo);
+      color: var(--texto);
+      /* Respeta las safe areas (notch, barra inferior) */
+      padding:
+        env(safe-area-inset-top)
+        env(safe-area-inset-right)
+        env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* La pantalla ocupa todo el alto y reparte el contenido */
+    .pantalla {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+
+    /* Cabecera: nombre + tagline */
+    .cabecera {
+      padding-top: 12px;
+    }
+    .marca {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin: 0;
+    }
+    .tagline {
+      font-size: 17px;
+      color: var(--texto-2);
+      margin: 4px 0 0;
+    }
+
+    /* Zona central: la tarjeta con la acción principal */
+    .centro {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tarjeta {
+      width: 100%;
+      max-width: 420px;
+      background: var(--superficie);
+      border-radius: var(--r-tarjeta);
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .tarjeta p {
+      color: var(--texto-2);
+      font-size: 15px;
+      line-height: 1.4;
+      margin: 0 0 20px;
+    }
+
+    /* Botón principal estilo iOS */
+    .boton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      border: none;
+      border-radius: var(--r-boton);
+      background: var(--acento);
+      color: #FFFFFF;
+      font-size: 17px;
+      font-weight: 600;
+      padding: 16px;
+      cursor: pointer;
+      transition: transform 200ms var(--curva-ios), opacity 200ms var(--curva-ios);
+    }
+    .boton:active { transform: scale(0.97); opacity: 0.9; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boton { transition: none; }
+      .boton:active { transform: none; }
+    }
+
+    /* Botón secundario (texto, sin relleno) */
+    .boton-2 {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--acento);
+      font-size: 17px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+    }
+
+    /* Fila de botones en la previsualización */
+    .acciones { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; }
+
+    /* Foto del ticket en la previsualización */
+    .foto {
+      width: 100%;
+      max-width: 420px;
+      border-radius: var(--r-tarjeta);
+      display: block;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+
+    /* Cambiar entre vistas: ocultas las que no tocan */
+    .oculto { display: none !important; }
+
+    /* Pantalla "Leyendo ticket…" */
+    .cargando { text-align: center; }
+    .spinner {
+      width: 44px; height: 44px; margin: 0 auto 18px;
+      border: 4px solid var(--lila, #e5e1f5);
+      border-top-color: var(--acento);
+      border-radius: 50%;
+      animation: girar 0.9s linear infinite;
+    }
+    @keyframes girar { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation: none; }
+    }
+
+    /* Lista de datos extraídos del ticket */
+    .datos {
+      width: 100%; max-width: 420px;
+      background: var(--superficie);
+      border-radius: var(--r-tarjeta);
+      padding: 8px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    /* Cada campo editable: etiqueta pequeña arriba, casilla debajo */
+    .campo {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(120,120,128,0.18);
+    }
+    .campo:last-child { border-bottom: none; }
+    .campo label {
+      display: block;
+      font-size: 12px; color: var(--texto-2);
+      margin-bottom: 4px;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .campo input, .campo select {
+      width: 100%;
+      border: none; background: transparent;
+      color: var(--texto);
+      font-size: 16px; font-weight: 600;
+      font-family: inherit;
+      padding: 2px 0;
+      -webkit-appearance: none; appearance: none;
+    }
+    .campo input:focus, .campo select:focus { outline: none; }
+    .campo select { font-weight: 600; }
+
+    /* Aviso de baja confianza */
+    .aviso {
+      width: 100%; max-width: 420px;
+      margin-bottom: 12px; padding: 12px 16px;
+      border-radius: var(--r-boton);
+      background: #fff3cd; color: #7a5b00;
+      font-size: 14px; line-height: 1.4;
+    }
+    @media (prefers-color-scheme: dark) {
+      .aviso { background: #3a2f00; color: #ffd86b; }
+    }
+
+    /* Pie: créditos */
+    .creditos {
+      text-align: center;
+      font-size: 13px;
+      color: var(--texto-2);
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <!-- VISTA 1: inicio (hacer foto) -->
+  <main class="pantalla" id="vista-inicio">
+    <header class="cabecera">
+      <h1 class="marca">Gastón</h1>
+      <p class="tagline">tu asistente de tickets</p>
+    </header>
+
+    <section class="centro">
+      <div class="tarjeta">
+        <p>Haz una foto de tu ticket y yo me encargo de apuntar el gasto.</p>
+        <button class="boton" id="btn-foto" type="button">
+          📷&nbsp; Hacer foto
+        </button>
+      </div>
+    </section>
+
+    <footer class="creditos">
+      by Oriol Peñalver and Claude
+    </footer>
+  </main>
+
+  <!-- VISTA 2: previsualización de la foto -->
+  <main class="pantalla oculto" id="vista-foto">
+    <header class="cabecera">
+      <h1 class="marca">Tu ticket</h1>
+      <p class="tagline">¿se ve bien?</p>
+    </header>
+
+    <section class="centro">
+      <img class="foto" id="foto-preview" alt="Foto del ticket">
+    </section>
+
+    <div class="acciones">
+      <button class="boton" id="btn-usar" type="button">Usar foto</button>
+      <button class="boton-2" id="btn-repetir" type="button">Repetir</button>
+    </div>
+  </main>
+
+  <!-- VISTA 3: trabajando (leyendo o guardando) -->
+  <main class="pantalla oculto" id="vista-cargando">
+    <section class="centro">
+      <div class="cargando">
+        <div class="spinner"></div>
+        <p class="marca" style="font-size:22px;" id="cargando-titulo">Leyendo ticket…</p>
+        <p class="tagline" id="cargando-sub">Gastón está apuntando los datos.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- VISTA 4: revisión de los datos extraídos -->
+  <main class="pantalla oculto" id="vista-revision">
+    <header class="cabecera">
+      <h1 class="marca">Revisa el gasto</h1>
+      <p class="tagline">esto ha leído Gastón</p>
+    </header>
+
+    <section class="centro" style="flex-direction:column; gap:0;">
+      <div class="aviso oculto" id="aviso-confianza"></div>
+      <div class="datos" id="datos-ticket"></div>
+    </section>
+
+    <div class="acciones">
+      <button class="boton" id="btn-guardar" type="button">Guardar gasto</button>
+      <button class="boton-2" id="btn-otra" type="button">Hacer otra foto</button>
+    </div>
+  </main>
+
+  <!-- VISTA 5: gasto guardado -->
+  <main class="pantalla oculto" id="vista-exito">
+    <section class="centro">
+      <div class="cargando">
+        <p style="font-size:54px; margin:0;">✅</p>
+        <p class="marca" style="font-size:24px;">¡Gasto guardado!</p>
+        <p class="tagline">Ya está en tu hoja de gastos.</p>
+      </div>
+    </section>
+    <div class="acciones">
+      <button class="boton" id="btn-otra-2" type="button">Apuntar otro</button>
+    </div>
+  </main>
+
+  <!-- Abre la cámara del móvil (o el selector de archivos en escritorio) -->
+  <input type="file" id="input-foto" accept="image/*" capture="environment" hidden>
+
+  <script>
+    // ── Configuración ──────────────────────────────────────────────
+    // URL del backend (Apps Script). Si algún día rehaces el despliegue,
+    // cambia SOLO esta línea por la nueva URL que acabe en /exec.
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbx6qG67cRQleQCOg-x7J6EKv-GN2pf-6_R1ItfTf1oIUWXvO9jWW5QEAgTGYlssqEIX5g/exec";
+
+    // Categorías válidas (deben coincidir con las del backend y la Sheet).
+    const CATEGORIAS = [
+      "Restaurante", "Gasolina", "Transporte", "Alojamiento",
+      "Material", "Software", "Otros",
+    ];
+
+    // Campos del formulario de revisión: clave, etiqueta y tipo de casilla.
+    // tipo: "texto" | "numero" | "fecha" | "categoria"
+    const CAMPOS = [
+      ["proveedor",   "Proveedor",     "texto"],
+      ["total",       "Total (€)",     "numero"],
+      ["fecha_ticket","Fecha",         "fecha"],
+      ["categoria",   "Categoría",     "categoria"],
+      ["base",        "Base (€)",      "numero"],
+      ["tipo_iva",    "Tipo IVA (%)",  "numero"],
+      ["cuota_iva",   "Cuota IVA (€)", "numero"],
+      ["nif",         "NIF",           "texto"],
+      ["concepto",    "Concepto",      "texto"],
+      ["forma_pago",  "Forma de pago", "texto"],
+      ["direccion",   "Dirección",     "texto"],
+      ["usuario",     "Usuario (quién paga)", "texto"],
+      ["notas",       "Notas",         "texto"],
+    ];
+
+    // Referencias a los elementos que vamos a manejar.
+    const inputFoto   = document.getElementById("input-foto");
+    const fotoPreview = document.getElementById("foto-preview");
+    const VISTAS = ["inicio", "foto", "cargando", "revision", "exito"];
+
+    // Guardamos la URL temporal de la foto para poder liberarla luego.
+    let urlFoto = null;
+    // Y el archivo elegido, para enviarlo al pulsar "Usar foto".
+    let archivoActual = null;
+    // La foto ya encogida (base64), para reusarla al guardar sin re-procesar.
+    let imagenActual = null;
+
+    // Cambia el texto de la pantalla de "trabajando" (leer / guardar).
+    function cargandoTexto(titulo, sub) {
+      document.getElementById("cargando-titulo").textContent = titulo;
+      document.getElementById("cargando-sub").textContent = sub;
+    }
+
+    function mostrar(vista) {
+      VISTAS.forEach(function (v) {
+        document.getElementById("vista-" + v).classList.toggle("oculto", v !== vista);
+      });
+    }
+
+    // 1) Pulsar "Hacer foto" abre la cámara (el input oculto).
+    document.getElementById("btn-foto").addEventListener("click", function () {
+      inputFoto.click();
+    });
+
+    // 2) Cuando hay foto: la mostramos en la pantalla de previsualización.
+    inputFoto.addEventListener("change", function () {
+      const archivo = inputFoto.files[0];
+      if (!archivo) return;                 // el usuario canceló la cámara
+
+      archivoActual = archivo;
+      if (urlFoto) URL.revokeObjectURL(urlFoto);  // libera la anterior
+      urlFoto = URL.createObjectURL(archivo);
+      fotoPreview.src = urlFoto;
+      mostrar("foto");
+    });
+
+    // 3) "Repetir" / "Hacer otra foto": vuelve al inicio y reabre la cámara.
+    function reiniciar() {
+      inputFoto.value = "";                 // permite re-elegir la misma foto
+      mostrar("inicio");
+    }
+    document.getElementById("btn-repetir").addEventListener("click", reiniciar);
+    document.getElementById("btn-otra").addEventListener("click", reiniciar);
+    document.getElementById("btn-otra-2").addEventListener("click", reiniciar);
+
+    // 4) "Usar foto": encoge la imagen, la manda al backend y muestra el JSON.
+    document.getElementById("btn-usar").addEventListener("click", async function () {
+      if (!archivoActual) return;
+      cargandoTexto("Leyendo ticket…", "Gastón está apuntando los datos.");
+      mostrar("cargando");
+      try {
+        const imagen = await encogerImagen(archivoActual);  // base64 sin prefijo
+        imagenActual = imagen;                              // la reusaremos al guardar
+        const datos = await leerTicket(imagen);
+        if (datos.error) {
+          alert("No se pudo leer el ticket:\n" + datos.error);
+          mostrar("foto");
+          return;
+        }
+        pintarRevision(datos);
+        mostrar("revision");
+      } catch (err) {
+        alert("Hubo un problema:\n" + err);
+        mostrar("foto");
+      }
+    });
+
+    // Reduce la foto a máx. 1600 px y la devuelve en base64 (JPEG, sin prefijo).
+    function encogerImagen(archivo) {
+      return new Promise(function (resolve, reject) {
+        const img = new Image();
+        img.onload = function () {
+          const MAX = 1600;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            const escala = MAX / Math.max(width, height);
+            width = Math.round(width * escala);
+            height = Math.round(height * escala);
+          }
+          const lienzo = document.createElement("canvas");
+          lienzo.width = width;
+          lienzo.height = height;
+          lienzo.getContext("2d").drawImage(img, 0, 0, width, height);
+          const dataUrl = lienzo.toDataURL("image/jpeg", 0.8);
+          URL.revokeObjectURL(img.src);
+          resolve(dataUrl.split(",")[1]);    // quitamos "data:image/jpeg;base64,"
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(archivo);
+      });
+    }
+
+    // Envía la imagen al backend. Usamos texto plano para evitar bloqueos CORS.
+    async function leerTicket(imagenBase64) {
+      const res = await fetch(BACKEND_URL, {
+        method: "POST",
+        body: JSON.stringify({ imagen: imagenBase64, tipo: "image/jpeg" }),
+      });
+      return res.json();
+    }
+
+    // Guardamos lo que leyó la IA para conservar campos no editables (moneda…).
+    let datosTicket = {};
+
+    // Construye el formulario editable con lo que leyó la IA.
+    function pintarRevision(d) {
+      datosTicket = d || {};
+      const cont = document.getElementById("datos-ticket");
+      cont.innerHTML = "";
+
+      CAMPOS.forEach(function (campo) {
+        const clave = campo[0], etiqueta = campo[1], tipo = campo[2];
+        let valor = d[clave];
+        if (valor === null || valor === undefined) valor = "";
+        // El usuario no lo lee la IA: recordamos el último que se escribió.
+        if (clave === "usuario" && !valor) valor = localStorage.getItem("gaston_usuario") || "";
+
+        const fila = document.createElement("div");
+        fila.className = "campo";
+
+        const lab = document.createElement("label");
+        lab.textContent = etiqueta;
+        lab.setAttribute("for", "f-" + clave);
+        fila.appendChild(lab);
+
+        let control;
+        if (tipo === "categoria") {
+          control = document.createElement("select");
+          CATEGORIAS.forEach(function (cat) {
+            const op = document.createElement("option");
+            op.value = cat; op.textContent = cat;
+            if (cat === valor) op.selected = true;
+            control.appendChild(op);
+          });
+          if (!valor) control.value = "Otros";   // por defecto si la IA no la vio
+        } else {
+          control = document.createElement("input");
+          if (tipo === "numero") {
+            control.type = "number"; control.step = "0.01"; control.inputMode = "decimal";
+          } else if (tipo === "fecha") {
+            control.type = "date";
+          } else {
+            control.type = "text";
+          }
+          control.value = valor;
+          control.placeholder = "—";
+        }
+        control.id = "f-" + clave;
+        control.dataset.clave = clave;
+        fila.appendChild(control);
+        cont.appendChild(fila);
+      });
+
+      // Aviso si la IA no está segura de la lectura.
+      const aviso = document.getElementById("aviso-confianza");
+      if (d.confianza && d.confianza !== "alta") {
+        aviso.textContent = "⚠️ Gastón no está del todo seguro de esta lectura (confianza " +
+          d.confianza + "). Revisa bien los datos antes de guardar.";
+        aviso.classList.remove("oculto");
+      } else {
+        aviso.classList.add("oculto");
+      }
+    }
+
+    // Lee las casillas (ya editadas por el usuario) y arma el objeto del gasto.
+    function recogerDatos() {
+      const gasto = {
+        moneda: datosTicket.moneda || "EUR",
+        multitipo_iva: !!datosTicket.multitipo_iva,
+      };
+      document.querySelectorAll("#datos-ticket [data-clave]").forEach(function (control) {
+        gasto[control.dataset.clave] = control.value.trim();
+      });
+      return gasto;
+    }
+
+    // "Guardar gasto": manda el gasto editado + la foto al backend (Sheet + Drive).
+    document.getElementById("btn-guardar").addEventListener("click", async function () {
+      const gasto = recogerDatos();
+      if (gasto.usuario) localStorage.setItem("gaston_usuario", gasto.usuario);
+      cargandoTexto("Guardando gasto…", "Subiendo la foto y apuntando la fila.");
+      mostrar("cargando");
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: "POST",
+          body: JSON.stringify({ accion: "guardar", gasto: gasto, imagen: imagenActual, tipo: "image/jpeg" }),
+        });
+        const resp = await res.json();
+        if (resp.error) {
+          alert("No se pudo guardar:\n" + resp.error);
+          mostrar("revision");
+          return;
+        }
+        mostrar("exito");
+      } catch (err) {
+        alert("Hubo un problema al guardar:\n" + err);
+        mostrar("revision");
+      }
+    });
+
+    // Registramos el service worker: hace que la app cargue offline y sea instalable.
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js");
+      });
+    }
+  </script>
+</body>
+</html>
