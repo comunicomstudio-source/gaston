@@ -475,7 +475,7 @@
       return new Promise(function (resolve, reject) {
         const img = new Image();
         img.onload = function () {
-          const MAX = 1600;
+          const MAX = 1280;   // suficiente para leer el ticket y más rápido en 3G
           let { width, height } = img;
           if (width > MAX || height > MAX) {
             const escala = MAX / Math.max(width, height);
@@ -486,7 +486,7 @@
           lienzo.width = width;
           lienzo.height = height;
           lienzo.getContext("2d").drawImage(img, 0, 0, width, height);
-          const dataUrl = lienzo.toDataURL("image/jpeg", 0.8);
+          const dataUrl = lienzo.toDataURL("image/jpeg", 0.72);
           URL.revokeObjectURL(img.src);
           resolve(dataUrl.split(",")[1]);    // quitamos "data:image/jpeg;base64,"
         };
@@ -630,8 +630,8 @@
         const res = await fetch(BACKEND_URL, {
           method: "POST",
           body: JSON.stringify({
-            token: APP_TOKEN, accion: "guardar", gasto: gasto, imagen: imagenActual,
-            tipo: "image/jpeg", forzar: forzar,
+            token: APP_TOKEN, accion: "guardar", gasto: gasto,
+            enlace_foto: datosTicket.enlace_foto || "", forzar: forzar,
           }),
         });
         const resp = await res.json();
