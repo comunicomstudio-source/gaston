@@ -3,7 +3,7 @@
 // y funcione aunque no haya conexión.
 
 // Sube este número cuando cambies los archivos cacheados (fuerza actualización).
-const VERSION = "gaston-v12";
+const VERSION = "gaston-v14";
 
 // Archivos que forman la cáscara de la app.
 const ARCHIVOS = [

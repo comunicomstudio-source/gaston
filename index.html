@@ -221,11 +221,11 @@
       .aviso-error { background: #45161a; color: #ff9aa2; }
     }
 
-    /* Botón gris (secundario neutro) */
+    /* Botón gris (secundario neutro) con ligero degradado */
     .boton-gris {
       width: 100%; border: none;
       border-radius: var(--r-boton);
-      background: rgba(120,120,128,0.16);
+      background: linear-gradient(180deg, rgba(142,142,147,0.30), rgba(142,142,147,0.16));
       color: var(--texto);
       font-size: 16px; font-weight: 600;
       padding: 14px; cursor: pointer; margin-top: 10px;
@@ -349,7 +349,7 @@
     </section>
 
     <div class="acciones">
-      <button class="boton-gris" id="btn-dashboard" type="button">📊 Ver dashboard</button>
+      <button class="boton-gris" id="btn-dashboard" type="button">Ver dashboard</button>
     </div>
     <footer class="creditos">by Oriol Peñalver and Claude</footer>
   </main>
@@ -392,6 +392,7 @@
     // Campos del formulario de revisión: clave, etiqueta y tipo de casilla.
     // tipo: "texto" | "numero" | "fecha" | "categoria"
     const CAMPOS = [
+      ["usuario",     "Usuario (quién paga)", "texto"],
       ["proveedor",   "Proveedor",     "texto"],
       ["total",       "Total (€)",     "numero"],
       ["fecha_ticket","Fecha",         "fecha"],
@@ -403,7 +404,6 @@
       ["concepto",    "Concepto",      "texto"],
       ["forma_pago",  "Forma de pago", "texto"],
       ["direccion",   "Dirección",     "texto"],
-      ["usuario",     "Usuario (quién paga)", "texto"],
       ["notas",       "Notas",         "texto"],
     ];
 
@@ -693,8 +693,9 @@
 
     // Nombre del mes "yyyy-MM" → "sept. 2025".
     function nombreMes(clave) {
-      const partes = clave.split("-");
+      const partes = (clave || "").split("-");
       const d = new Date(Number(partes[0]), Number(partes[1]) - 1, 1);
+      if (isNaN(d.getTime())) return clave || "—";   // por si llega algo raro
       return d.toLocaleDateString("es-ES", { month: "short", year: "numeric" });
     }
 
