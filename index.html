@@ -217,6 +217,17 @@
       .aviso { background: #3a2f00; color: #ffd86b; }
     }
 
+    /* Pantalla de éxito: botón + enlaces */
+    .bloque-exito { width: 100%; max-width: 420px; }
+    .enlaces {
+      display: flex; justify-content: center; align-items: center; gap: 12px;
+      margin-top: 16px; font-size: 15px;
+    }
+    .enlaces a {
+      color: var(--acento); text-decoration: none; font-weight: 600;
+    }
+    .enlaces .sep { color: var(--texto-2); }
+
     /* Pie: créditos */
     .creditos {
       text-align: center;
@@ -246,23 +257,6 @@
     <footer class="creditos">
       by Oriol Peñalver and Claude
     </footer>
-  </main>
-
-  <!-- VISTA 2: previsualización de la foto -->
-  <main class="pantalla oculto" id="vista-foto">
-    <header class="cabecera">
-      <h1 class="marca">Tu ticket</h1>
-      <p class="tagline">¿se ve bien?</p>
-    </header>
-
-    <section class="centro">
-      <img class="foto" id="foto-preview" alt="Foto del ticket">
-    </section>
-
-    <div class="acciones">
-      <button class="boton" id="btn-usar" type="button">Usar foto</button>
-      <button class="boton-2" id="btn-repetir" type="button">Repetir</button>
-    </div>
   </main>
 
   <!-- VISTA 3: trabajando (leyendo o guardando) -->
@@ -296,16 +290,24 @@
 
   <!-- VISTA 5: gasto guardado -->
   <main class="pantalla oculto" id="vista-exito">
+    <header class="cabecera" style="text-align:center; padding-top:24px;">
+      <p style="font-size:27px; margin:0 0 2px;">✅</p>
+      <h1 class="marca" style="font-size:24px;">¡Gasto guardado!</h1>
+      <p class="tagline">Ya está en tu hoja de gastos.</p>
+    </header>
+
     <section class="centro">
-      <div class="cargando">
-        <p style="font-size:54px; margin:0;">✅</p>
-        <p class="marca" style="font-size:24px;">¡Gasto guardado!</p>
-        <p class="tagline">Ya está en tu hoja de gastos.</p>
+      <div class="bloque-exito">
+        <button class="boton" id="btn-otra-2" type="button">Apuntar otro</button>
+        <div class="enlaces">
+          <a href="https://docs.google.com/spreadsheets/d/1HRIO3cMyLOnA8S7E8_NFq97RLHa_-8Y9X0IdftmSADM/edit"
+             target="_blank" rel="noopener">Ver la hoja</a>
+          <span class="sep">·</span>
+          <a href="https://drive.google.com/drive/folders/1v5FpGiVg9JoDX0fDVsCPJZIwv6pc_g_i"
+             target="_blank" rel="noopener">Ver tickets</a>
+        </div>
       </div>
     </section>
-    <div class="acciones">
-      <button class="boton" id="btn-otra-2" type="button">Apuntar otro</button>
-    </div>
   </main>
 
   <!-- Abre la cámara del móvil (o el selector de archivos en escritorio) -->
@@ -342,15 +344,11 @@
     ];
 
     // Referencias a los elementos que vamos a manejar.
-    const inputFoto   = document.getElementById("input-foto");
-    const fotoPreview = document.getElementById("foto-preview");
-    const VISTAS = ["inicio", "foto", "cargando", "revision", "exito"];
+    const inputFoto = document.getElementById("input-foto");
+    const VISTAS = ["inicio", "cargando", "revision", "exito"];
 
-    // Guardamos la URL temporal de la foto para poder liberarla luego.
-    let urlFoto = null;
-    // Y el archivo elegido, para enviarlo al pulsar "Usar foto".
+    // El archivo elegido y la foto ya encogida (base64), para reusarla al guardar.
     let archivoActual = null;
-    // La foto ya encogida (base64), para reusarla al guardar sin re-procesar.
     let imagenActual = null;
 
     // Cambia el texto de la pantalla de "trabajando" (leer / guardar).
@@ -370,48 +368,43 @@
       inputFoto.click();
     });
 
-    // 2) Cuando hay foto: la mostramos en la pantalla de previsualización.
+    // 2) Al elegir/hacer la foto, la mandamos directa a leer (el iPhone ya te
+    //    deja confirmar o repetir antes, así que no repetimos esa pantalla).
     inputFoto.addEventListener("change", function () {
       const archivo = inputFoto.files[0];
       if (!archivo) return;                 // el usuario canceló la cámara
-
       archivoActual = archivo;
-      if (urlFoto) URL.revokeObjectURL(urlFoto);  // libera la anterior
-      urlFoto = URL.createObjectURL(archivo);
-      fotoPreview.src = urlFoto;
-      mostrar("foto");
+      procesarFoto();
     });
 
-    // 3) "Repetir" / "Hacer otra foto": vuelve al inicio y reabre la cámara.
+    // 3) "Hacer otra foto" / "Apuntar otro": vuelve al inicio.
     function reiniciar() {
       inputFoto.value = "";                 // permite re-elegir la misma foto
       mostrar("inicio");
     }
-    document.getElementById("btn-repetir").addEventListener("click", reiniciar);
     document.getElementById("btn-otra").addEventListener("click", reiniciar);
     document.getElementById("btn-otra-2").addEventListener("click", reiniciar);
 
-    // 4) "Usar foto": encoge la imagen, la manda al backend y muestra el JSON.
-    document.getElementById("btn-usar").addEventListener("click", async function () {
+    // 4) Encoge la imagen, la manda al backend y muestra el formulario.
+    async function procesarFoto() {
       if (!archivoActual) return;
       cargandoTexto("Leyendo ticket…", "Gastón está apuntando los datos.");
       mostrar("cargando");
       try {
-        const imagen = await encogerImagen(archivoActual);  // base64 sin prefijo
-        imagenActual = imagen;                              // la reusaremos al guardar
-        const datos = await leerTicket(imagen);
+        imagenActual = await encogerImagen(archivoActual);  // base64, la reusamos al guardar
+        const datos = await leerTicket(imagenActual);
         if (datos.error) {
           alert("No se pudo leer el ticket:\n" + datos.error);
-          mostrar("foto");
+          mostrar("inicio");
           return;
         }
         pintarRevision(datos);
         mostrar("revision");
       } catch (err) {
         alert("Hubo un problema:\n" + err);
-        mostrar("foto");
+        mostrar("inicio");
       }
-    });
+    }
 
     // Reduce la foto a máx. 1600 px y la devuelve en base64 (JPEG, sin prefijo).
     function encogerImagen(archivo) {
@@ -523,7 +516,12 @@
     }
 
     // "Guardar gasto": manda el gasto editado + la foto al backend (Sheet + Drive).
-    document.getElementById("btn-guardar").addEventListener("click", async function () {
+    document.getElementById("btn-guardar").addEventListener("click", function () {
+      guardarGasto(false);
+    });
+
+    // forzar=true salta el aviso de duplicado y guarda igualmente.
+    async function guardarGasto(forzar) {
       const gasto = recogerDatos();
       if (gasto.usuario) localStorage.setItem("gaston_usuario", gasto.usuario);
       cargandoTexto("Guardando gasto…", "Subiendo la foto y apuntando la fila.");
@@ -531,9 +529,25 @@
       try {
         const res = await fetch(BACKEND_URL, {
           method: "POST",
-          body: JSON.stringify({ accion: "guardar", gasto: gasto, imagen: imagenActual, tipo: "image/jpeg" }),
+          body: JSON.stringify({
+            accion: "guardar", gasto: gasto, imagen: imagenActual,
+            tipo: "image/jpeg", forzar: forzar,
+          }),
         });
         const resp = await res.json();
+
+        // ¿El backend detectó un ticket ya guardado? Avisamos y dejamos decidir.
+        if (resp.duplicado) {
+          const e = resp.existente || {};
+          const ok = confirm(
+            "⚠️ Parece que ya guardaste este ticket:\n\n" +
+            (e.proveedor || "—") + " · " + (e.fecha_ticket || "—") +
+            " · " + (e.total || "—") + " €\n\n¿Guardarlo de todas formas?"
+          );
+          if (ok) { guardarGasto(true); }     // reintenta forzando
+          else { mostrar("revision"); }
+          return;
+        }
         if (resp.error) {
           alert("No se pudo guardar:\n" + resp.error);
           mostrar("revision");
@@ -544,7 +558,7 @@
         alert("Hubo un problema al guardar:\n" + err);
         mostrar("revision");
       }
-    });
+    }
 
     // Registramos el service worker: hace que la app cargue offline y sea instalable.
     if ("serviceWorker" in navigator) {
