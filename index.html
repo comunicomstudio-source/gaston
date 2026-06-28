@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-title" content="Gastón">
 
   <link rel="manifest" href="manifest.webmanifest">
-  <title>Gastón — tu asistente de tickets</title>
+  <title>Gastón — tu asistente de tiquets</title>
 
   <style>
     /* ===== Tokens de diseño (del CLAUDE.md) ===== */
@@ -159,7 +159,7 @@
     /* Cambiar entre vistas: ocultas las que no tocan */
     .oculto { display: none !important; }
 
-    /* Pantalla "Leyendo ticket…" */
+    /* Pantalla "Leyendo tiquet…" */
     .cargando { text-align: center; }
     .spinner {
       width: 44px; height: 44px; margin: 0 auto 18px;
@@ -278,21 +278,26 @@
   <main class="pantalla" id="vista-inicio">
     <header class="cabecera">
       <h1 class="marca">Gastón</h1>
-      <p class="tagline">tu asistente de tickets</p>
+      <p class="tagline">tu asistente de tiquets</p>
     </header>
 
-    <section class="centro">
+    <section class="centro" style="flex-direction:column;">
       <div class="tarjeta">
-        <p>Haz una foto de tu ticket y yo me encargo de apuntar el gasto.</p>
+        <p>Haz una foto de tu tiquet y yo me encargo de apuntar el gasto.</p>
         <button class="boton" id="btn-foto" type="button">
           📷&nbsp; Hacer foto
         </button>
       </div>
+      <div class="enlaces">
+        <a href="https://docs.google.com/spreadsheets/d/1HRIO3cMyLOnA8S7E8_NFq97RLHa_-8Y9X0IdftmSADM/edit"
+           target="_blank" rel="noopener">Ver la hoja</a>
+        <span class="sep">·</span>
+        <a href="https://drive.google.com/drive/folders/1v5FpGiVg9JoDX0fDVsCPJZIwv6pc_g_i"
+           target="_blank" rel="noopener">Ver tiquets</a>
+      </div>
     </section>
 
-    <footer class="creditos">
-      by Oriol Peñalver and Claude
-    </footer>
+    <footer class="creditos"></footer>
   </main>
 
   <!-- VISTA 3: trabajando (leyendo o guardando) -->
@@ -300,7 +305,7 @@
     <section class="centro">
       <div class="cargando">
         <div class="spinner"></div>
-        <p class="marca" style="font-size:22px;" id="cargando-titulo">Leyendo ticket…</p>
+        <p class="marca" style="font-size:22px;" id="cargando-titulo">Leyendo tiquet…</p>
         <p class="tagline" id="cargando-sub">Gastón está apuntando los datos.</p>
       </div>
     </section>
@@ -343,7 +348,7 @@
              target="_blank" rel="noopener">Ver la hoja</a>
           <span class="sep">·</span>
           <a href="https://drive.google.com/drive/folders/1v5FpGiVg9JoDX0fDVsCPJZIwv6pc_g_i"
-             target="_blank" rel="noopener">Ver tickets</a>
+             target="_blank" rel="noopener">Ver tiquets</a>
         </div>
       </div>
     </section>
@@ -383,6 +388,12 @@
     // Token compartido (debe coincidir con el APP_TOKEN del Apps Script).
     const APP_TOKEN = "gstn_kP7mZ2aQ9xV4tR8wL3";
 
+    // Versión visible de la app (subir a mano con cada cambio). Sale en el pie.
+    const APP_VERSION = "1.6";
+    document.querySelectorAll(".creditos").forEach(function (el) {
+      el.textContent = "Gastón V" + APP_VERSION + " by Oriol Peñalver and Claude";
+    });
+
     // Categorías válidas (deben coincidir con las del backend y la Sheet).
     const CATEGORIAS = [
       "Restaurante", "Gasolina", "Transporte", "Alojamiento",
@@ -404,7 +415,6 @@
       ["concepto",    "Concepto",      "texto"],
       ["forma_pago",  "Forma de pago", "texto"],
       ["direccion",   "Dirección",     "texto"],
-      ["notas",       "Notas",         "texto"],
     ];
 
     // Referencias a los elementos que vamos a manejar.
@@ -452,13 +462,13 @@
     // 4) Encoge la imagen, la manda al backend y muestra el formulario.
     async function procesarFoto() {
       if (!archivoActual) return;
-      cargandoTexto("Leyendo ticket…", "Gastón está apuntando los datos.");
+      cargandoTexto("Leyendo tiquet…", "Gastón está apuntando los datos.");
       mostrar("cargando");
       try {
         imagenActual = await encogerImagen(archivoActual);  // base64, la reusamos al guardar
         const datos = await leerTicket(imagenActual);
         if (datos.error) {
-          alert("No se pudo leer el ticket:\n" + datos.error);
+          alert("No se pudo leer el tiquet:\n" + datos.error);
           mostrar("inicio");
           return;
         }
@@ -641,7 +651,7 @@
         if (resp.duplicado) {
           const e = resp.existente || {};
           const ok = confirm(
-            "⚠️ Parece que ya guardaste este ticket:\n\n" +
+            "⚠️ Parece que ya guardaste este tiquet:\n\n" +
             (e.proveedor || "—") + " · " + (e.fecha_ticket || "—") +
             " · " + (e.total || "—") + " €\n\n¿Guardarlo de todas formas?"
           );
@@ -703,14 +713,14 @@
     function pintarDashboard(r) {
       const cont = document.getElementById("dashboard-cont");
       if (!r.num_tickets) {
-        cont.innerHTML = '<p class="dash-vacio">Aún no hay gastos guardados.<br>Apunta tu primer ticket y vuelve aquí.</p>';
+        cont.innerHTML = '<p class="dash-vacio">Aún no hay gastos guardados.<br>Apunta tu primer tiquet y vuelve aquí.</p>';
         return;
       }
 
       let html = '<div class="dash-cifras">' +
         '<div class="dash-tarjeta"><div class="cifra">' + euros(r.total) + '</div><div class="etq">Total</div></div>' +
         '<div class="dash-tarjeta"><div class="cifra">' + euros(r.mes_actual) + '</div><div class="etq">Este mes</div></div>' +
-        '<div class="dash-tarjeta"><div class="cifra">' + r.num_tickets + '</div><div class="etq">Tickets</div></div>' +
+        '<div class="dash-tarjeta"><div class="cifra">' + r.num_tickets + '</div><div class="etq">Tiquets</div></div>' +
         '</div>';
 
       html += seccionBarras("Por categoría", r.por_categoria, function (x) { return x.categoria; });

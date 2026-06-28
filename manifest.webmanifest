@@ -1,7 +1,7 @@
 {
-  "name": "Gastón — tu asistente de tickets",
+  "name": "Gastón — tu asistente de tiquets",
   "short_name": "Gastón",
-  "description": "Fotografía tus tickets y Gastón apunta el gasto por ti.",
+  "description": "Fotografía tus tiquets y Gastón apunta el gasto por ti.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
